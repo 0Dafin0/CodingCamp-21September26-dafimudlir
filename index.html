@@ -1,0 +1,1852 @@
+<!DOCTYPE html>
+<!--
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║  TABUNGAN ONLEN v3                                                   ║
+  ║  Standalone · No Node.js · No build step · Open in any browser      ║
+  ║  Stack: React 18 CDN + Babel standalone + Tailwind CDN              ║
+  ║                                                                      ║
+  ║  localStorage keys:                                                  ║
+  ║    'tabungan_onlen_transactions'  — JSON array of transactions       ║
+  ║    'tabungan_onlen_budget'        — string number                    ║
+  ║    'tabungan_onlen_theme'         — 'dark' | 'light'                 ║
+  ║                                                                      ║
+  ║  NOTE ON 'use client':                                               ║
+  ║  This is a plain HTML+CDN file — NOT a Next.js project.             ║
+  ║  'use client' is a Next.js App Router directive; Babel standalone   ║
+  ║  has no Next.js transform and would throw a SyntaxError if it       ║
+  ║  appeared here. It is intentionally absent. The correct SSR-safe    ║
+  ║  pattern (localStorage only inside useEffect) is already applied.   ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+-->
+<html lang="id" class="">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Tabungan Onlen — Catat, visualisasi, dan hemat pengeluaranmu" />
+  <title>Tabungan Onlen 💰</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui'] },
+          screens: { xs: '400px' },
+        }
+      }
+    }
+  </script>
+
+  <!-- React 18 (development build — shows friendly errors in console) -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+  <!-- Babel standalone (JSX transform) -->
+  <script src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
+
+  <style>
+    /* ─── Reset & Base ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body { font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+           min-height: 100dvh; }
+
+    /* ─── Theme colour transition (applied globally, excluding animation props) ─── */
+    body { transition: background-color 0.3s ease, color 0.3s ease; }
+    .glass,
+    .glass * { transition: background-color 0.3s ease, border-color 0.3s ease,
+                            color 0.3s ease !important; }
+
+    /* ─── Glass morphism ─── */
+    .glass {
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(255, 255, 255, 0.55);
+    }
+    .dark .glass {
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    /* ─── Scrollbar ─── */
+    .thin-scroll::-webkit-scrollbar { width: 4px; }
+    .thin-scroll::-webkit-scrollbar-track { background: transparent; }
+    .thin-scroll::-webkit-scrollbar-thumb {
+      background: #d1d5db; border-radius: 99px;
+    }
+    .dark .thin-scroll::-webkit-scrollbar-thumb { background: #374151; }
+
+    /* ════════════ ANIMATIONS ════════════ */
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-8px); }
+    }
+    .anim-float { animation: float 3s ease-in-out infinite; }
+
+    @keyframes jelly {
+      0%, 100% { transform: scale(1, 1); }
+      18%      { transform: scale(1.15, 0.85); }
+      38%      { transform: scale(0.87, 1.13); }
+      58%      { transform: scale(1.08, 0.92); }
+      76%      { transform: scale(0.97, 1.03); }
+      88%      { transform: scale(1.02, 0.98); }
+    }
+    .jelly-once { animation: jelly 0.52s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+
+    @keyframes popIn {
+      0%   { opacity: 0; transform: scale(0.62) translateY(8px); }
+      55%  { transform: scale(1.07) translateY(-2px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .pop-in { animation: popIn 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .slide-down { animation: slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .slide-up { animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+    @keyframes slideFromLeft {
+      from { opacity: 0; transform: translateX(-22px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    .slide-left { animation: slideFromLeft 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+    @keyframes slideFromRight {
+      from { opacity: 0; transform: translateX(22px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    .slide-right { animation: slideFromRight 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+    /* List item delete animation */
+    @keyframes exitRight {
+      to {
+        opacity: 0;
+        transform: translateX(52px) scale(0.94);
+        max-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        margin-top: 0;
+        margin-bottom: 0;
+        border-width: 0;
+        overflow: hidden;
+      }
+    }
+    .exit-right {
+      animation: exitRight 0.3s ease forwards;
+      max-height: 200px;
+      overflow: hidden;
+    }
+
+    /* Progress bar entry */
+    @keyframes growWidth { from { width: 0 !important; } }
+    .grow-width { animation: growWidth 1s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+    /* Category bar entry */
+    @keyframes barGrow { from { width: 0 !important; } }
+    .bar-grow { animation: barGrow 0.85s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+    /* Number pulse on value change */
+    @keyframes numPulse {
+      0%   { transform: scale(1); }
+      35%  { transform: scale(1.13); }
+      100% { transform: scale(1); }
+    }
+    .num-pulse { animation: numPulse 0.32s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+    /* Card hover lift */
+    .card-lift {
+      transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  box-shadow 0.22s ease !important;
+    }
+    .card-lift:hover { transform: translateY(-4px) scale(1.018); }
+
+    /* Ripple */
+    .ripple-host { position: relative; overflow: hidden; }
+    .ripple-host .rpl {
+      position: absolute; border-radius: 50%;
+      background: rgba(255, 255, 255, 0.38);
+      transform: scale(0);
+      animation: rippleOut 0.58s linear forwards;
+      pointer-events: none;
+    }
+    @keyframes rippleOut { to { transform: scale(4.5); opacity: 0; } }
+
+    /* SVG chart elements */
+    .donut-arc { transition: all 0.24s cubic-bezier(0.34, 1.56, 0.64, 1); cursor: pointer; }
+    .flow-node { transition: transform 0.26s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    .flow-node:hover { transform: scale(1.1) translateY(-3px); }
+
+    /* Confirm dialog backdrop */
+    .dialog-backdrop {
+      position: fixed; inset: 0; z-index: 9998;
+      background: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(3px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1rem;
+      animation: fadeIn 0.18s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* ─── Mobile touch targets ─── */
+    @media (max-width: 1023px) {
+      input, select, button, textarea {
+        min-height: 44px;
+      }
+      /* give form elements comfortable tap size */
+      .tap-lg { min-height: 48px !important; font-size: 1rem !important; }
+    }
+
+    /* ─── Right panel sticky on desktop ─── */
+    @media (min-width: 1024px) {
+      .right-sticky { position: sticky; top: 80px; }
+    }
+  </style>
+</head>
+
+<body>
+<!-- ── Instant loading placeholder (replaced when React mounts) ── -->
+<div id="root">
+  <div style="min-height:100dvh;display:flex;align-items:center;justify-content:center;
+              background:linear-gradient(135deg,#fff7ed,#fef9c3,#ecfdf5);">
+    <div style="text-align:center;color:#92400e;font-family:'Plus Jakarta Sans',sans-serif;">
+      <div style="font-size:3.5rem;animation:float 2s ease-in-out infinite">🏦</div>
+      <div style="font-size:1.35rem;font-weight:800;margin-top:.75rem;color:#f97316">
+        Tabungan Onlen
+      </div>
+      <div style="font-size:.85rem;margin-top:.4rem;color:#a16207">Memuat aplikasi…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     REACT APPLICATION
+══════════════════════════════════════════════════════════════════ -->
+<script type="text/babel" data-presets="react">
+/* global React, ReactDOM */
+const {
+  useState, useEffect, useRef, useMemo, useCallback, useReducer
+} = React;
+
+/* ══════════════════════════════════════════════════════════════
+   §1  STORAGE KEYS  (single source of truth)
+══════════════════════════════════════════════════════════════ */
+const KEYS = {
+  TXS:    'tabungan_onlen_transactions',
+  BUDGET: 'tabungan_onlen_budget',
+  THEME:  'tabungan_onlen_theme',
+};
+
+/* ══════════════════════════════════════════════════════════════
+   §2  SAFE localStorage WRAPPER
+   All methods wrapped in try/catch — safe in private browsing,
+   file:// protocol, or any environment where storage is blocked.
+   CRITICAL: These helpers are ONLY ever called inside useEffect
+   so they NEVER run during SSR or initial render.
+══════════════════════════════════════════════════════════════ */
+const LS = {
+  get(key, fallback = null) {
+    try {
+      const v = window.localStorage.getItem(key);
+      return v === null ? fallback : v;
+    } catch { return fallback; }
+  },
+  set(key, value) {
+    try { window.localStorage.setItem(key, String(value)); } catch {}
+  },
+  getJSON(key, fallback = null) {
+    try {
+      const v = window.localStorage.getItem(key);
+      return v ? JSON.parse(v) : fallback;
+    } catch { return fallback; }
+  },
+  setJSON(key, value) {
+    try { window.localStorage.setItem(key, JSON.stringify(value)); } catch {}
+  },
+};
+
+/* ══════════════════════════════════════════════════════════════
+   §3  CATEGORIES
+══════════════════════════════════════════════════════════════ */
+const CATS = [
+  { id:'makan',      label:'Makan & Minum',    emoji:'🍜', color:'#f97316' },
+  { id:'sewa',       label:'Sewa & Rumah',      emoji:'🏠', color:'#8b5cf6' },
+  { id:'belanja',    label:'Belanja',           emoji:'🛍️', color:'#ec4899' },
+  { id:'hiburan',    label:'Hiburan',           emoji:'🎬', color:'#06b6d4' },
+  { id:'transport',  label:'Transport',         emoji:'🚗', color:'#3b82f6' },
+  { id:'kesehatan',  label:'Kesehatan',         emoji:'💊', color:'#10b981' },
+  { id:'pendidikan', label:'Pendidikan',        emoji:'📚', color:'#f59e0b' },
+  { id:'tagihan',    label:'Tagihan & Listrik', emoji:'💡', color:'#6366f1' },
+  { id:'tabungan',   label:'Tabungan / Invest', emoji:'🏦', color:'#14b8a6' },
+  { id:'gaji',       label:'Gaji / Bulanan',    emoji:'💰', color:'#22c55e' },
+  { id:'sampingan',  label:'Penghasilan Lain',  emoji:'💻', color:'#0ea5e9' },
+  { id:'lainnya',    label:'Lainnya',           emoji:'📦', color:'#94a3b8' },
+];
+const CAT          = Object.fromEntries(CATS.map(c => [c.id, c]));
+const INCOME_IDS   = ['gaji', 'sampingan', 'lainnya'];
+const EXPENSE_IDS  = ['makan','sewa','belanja','hiburan','transport',
+                      'kesehatan','pendidikan','tagihan','tabungan','lainnya'];
+
+/* ══════════════════════════════════════════════════════════════
+   §4  FORMATTERS
+══════════════════════════════════════════════════════════════ */
+const _idr = new Intl.NumberFormat('id-ID', {
+  style: 'currency', currency: 'IDR', maximumFractionDigits: 0,
+});
+function rp(n)      { return _idr.format(Math.round(n)); }
+function rpShort(n) {
+  const abs  = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  if (abs >= 1_000_000_000) return `${sign}Rp ${(abs/1_000_000_000).toFixed(1)}M`;
+  if (abs >= 1_000_000)     return `${sign}Rp ${(abs/1_000_000).toFixed(1)}jt`;
+  if (abs >= 1_000)         return `${sign}Rp ${(abs/1_000).toFixed(0)}rb`;
+  return rp(n);
+}
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function uid()             { return Math.random().toString(36).slice(2, 11); }
+function todayISO()        { return new Date().toISOString().slice(0, 10); }
+
+/* ══════════════════════════════════════════════════════════════
+   §5  ANIMATED NUMBER COUNTER
+══════════════════════════════════════════════════════════════ */
+function AnimNum({ to, ms = 700 }) {
+  const [val,    setVal]  = useState(to);
+  const prevRef  = useRef(to);
+  const rafRef   = useRef(null);
+  const spanRef  = useRef(null);
+
+  useEffect(() => {
+    const from = prevRef.current;
+    if (from === to) return;
+    cancelAnimationFrame(rafRef.current);
+    const t0 = performance.now();
+    function tick(now) {
+      const p    = Math.min((now - t0) / ms, 1);
+      const ease = 1 - Math.pow(1 - p, 3);
+      setVal(from + (to - from) * ease);
+      if (p < 1) { rafRef.current = requestAnimationFrame(tick); }
+      else        { setVal(to); prevRef.current = to; }
+    }
+    rafRef.current = requestAnimationFrame(tick);
+    if (spanRef.current) {
+      spanRef.current.classList.remove('num-pulse');
+      void spanRef.current.offsetWidth;
+      spanRef.current.classList.add('num-pulse');
+    }
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [to]);
+
+  return <span ref={spanRef}>{rp(Math.round(val))}</span>;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   §6  JELLY BUTTON (ripple + spring squish)
+══════════════════════════════════════════════════════════════ */
+function Btn({ children, onClick, className = '', disabled = false,
+               type = 'button', title = '', 'aria-label': ariaLabel }) {
+  const btnRef   = useRef(null);
+  const [jelly, setJelly] = useState(false);
+
+  function handleClick(e) {
+    if (disabled) return;
+    // Ripple effect
+    const el = btnRef.current;
+    if (el) {
+      const rc = el.getBoundingClientRect();
+      const sz = Math.max(rc.width, rc.height) * 2.4;
+      const sp = document.createElement('span');
+      sp.className = 'rpl';
+      sp.style.cssText = `width:${sz}px;height:${sz}px;`
+                        +`left:${e.clientX - rc.left - sz/2}px;`
+                        +`top:${e.clientY  - rc.top  - sz/2}px`;
+      el.appendChild(sp);
+      setTimeout(() => sp.remove(), 660);
+    }
+    setJelly(true);
+    setTimeout(() => setJelly(false), 560);
+    onClick && onClick(e);
+  }
+
+  return (
+    <button
+      ref={btnRef} type={type} disabled={disabled}
+      title={title} aria-label={ariaLabel || title}
+      onClick={handleClick}
+      className={[
+        'ripple-host select-none outline-none',
+        'focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-1',
+        jelly   ? 'jelly-once'                       : '',
+        disabled ? 'opacity-50 cursor-not-allowed'   : 'cursor-pointer active:scale-95',
+        className,
+      ].join(' ')}
+    >
+      {children}
+    </button>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   §7  CONFIRM DIALOG (custom, no window.confirm)
+══════════════════════════════════════════════════════════════ */
+function ConfirmDialog({ message, onConfirm, onCancel }) {
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onCancel(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  return (
+    <div className="dialog-backdrop" onClick={onCancel}>
+      <div
+        className="glass rounded-2xl shadow-2xl w-full max-w-sm p-6 pop-in"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="text-4xl text-center mb-3">⚠️</div>
+        <p className="text-center text-sm font-semibold text-slate-700 dark:text-slate-200 leading-relaxed mb-6">
+          {message}
+        </p>
+        <div className="flex gap-3">
+          <Btn
+            onClick={onCancel}
+            className="flex-1 py-3 rounded-xl text-sm font-bold
+                       bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300
+                       hover:bg-slate-200 dark:hover:bg-slate-600 border
+                       border-slate-200 dark:border-slate-600"
+          >
+            Batal
+          </Btn>
+          <Btn
+            onClick={onConfirm}
+            className="flex-1 py-3 rounded-xl text-sm font-bold
+                       bg-rose-500 hover:bg-rose-600 text-white shadow-lg
+                       shadow-rose-200 dark:shadow-rose-900/40"
+          >
+            Ya, Hapus Semua
+          </Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   §8  TOAST NOTIFICATION
+══════════════════════════════════════════════════════════════ */
+function Toast({ msg, type = 'success', onClose }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 3400);
+    return () => clearTimeout(t);
+  }, []);
+  const bg = { success:'bg-emerald-500', error:'bg-rose-500',
+               info:'bg-sky-500', warn:'bg-amber-500' };
+  return (
+    <div
+      className={`fixed bottom-5 right-4 left-4 sm:left-auto sm:right-5
+                  z-[9999] flex items-center gap-3 px-4 py-3 rounded-2xl
+                  shadow-2xl text-white text-sm font-semibold max-w-sm
+                  sm:ml-auto pop-in ${bg[type] || bg.info}`}
+      role="alert"
+    >
+      <span className="flex-1">{msg}</span>
+      <button onClick={onClose} className="flex-shrink-0 opacity-75 hover:opacity-100 text-base leading-none">
+        ✕
+      </button>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   §9  SUMMARY CARD
+══════════════════════════════════════════════════════════════ */
+function SummaryCard({ title, value, emoji, textCls, iconBg, delay = 0 }) {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setShow(true), delay);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <div
+      className={`card-lift glass rounded-2xl p-4 sm:p-5 shadow-lg
+                  flex items-center gap-4 ${show ? 'pop-in' : 'opacity-0'}`}
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <div
+        className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center
+                   justify-center text-xl sm:text-2xl flex-shrink-0 shadow-md"
+        style={{ background: iconBg }}
+      >
+        {emoji}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-widest
+                      text-slate-500 dark:text-slate-400 mb-0.5">
+          {title}
+        </p>
+        <p className={`text-lg sm:text-xl font-extrabold truncate ${textCls}`}>
+          <AnimNum to={value} />
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   §10  HEADER
+══════════════════════════════════════════════════════════════ */
+function Header({ dark, onToggle, spent, budget, onExport, onImportClick }) {
+  const pct      = budget > 0 ? clamp((spent / budget) * 100, 0, 100) : 0;
+  const overBudget = budget > 0 && spent > budget;
+  const barColor = overBudget ? '#ef4444' : pct > 80 ? '#f97316' : '#22c55e';
+
+  return (
+    <header className="glass sticky top-0 z-50 shadow-md slide-down">
+      <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-3">
+
+        {/* ── Top row: Brand + Action buttons ── */}
+        <div className="flex items-center gap-3 flex-wrap justify-between">
+
+          {/* Brand */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="text-2xl sm:text-3xl anim-float select-none flex-shrink-0">🏦</span>
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-lg font-extrabold tracking-tight leading-none
+                             text-slate-800 dark:text-white truncate">
+                Tabungan <span className="text-orange-500">Onlen</span>
+              </h1>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5 hidden sm:block">
+                Catat · Visualisasi · Hemat
+              </p>
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+            {/* Export */}
+            <Btn
+              onClick={onExport} title="Ekspor data ke file JSON"
+              className="flex items-center gap-1.5 px-2.5 py-2 sm:px-3 sm:py-2 rounded-xl
+                         text-xs font-bold bg-emerald-50 dark:bg-emerald-900/30
+                         text-emerald-700 dark:text-emerald-400
+                         border border-emerald-200 dark:border-emerald-700
+                         hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+            >
+              <span className="hidden xs:inline">💾</span>
+              <span>Ekspor</span>
+            </Btn>
+
+            {/* Import */}
+            <Btn
+              onClick={onImportClick} title="Impor data dari file JSON"
+              className="flex items-center gap-1.5 px-2.5 py-2 sm:px-3 sm:py-2 rounded-xl
+                         text-xs font-bold bg-sky-50 dark:bg-sky-900/30
+                         text-sky-700 dark:text-sky-400
+                         border border-sky-200 dark:border-sky-700
+                         hover:bg-sky-100 dark:hover:bg-sky-900/50"
+            >
+              <span className="hidden xs:inline">📂</span>
+              <span>Impor</span>
+            </Btn>
+
+            {/* Dark mode toggle */}
+            <Btn
+              onClick={onToggle}
+              title={dark ? 'Ganti ke Mode Terang' : 'Ganti ke Mode Gelap'}
+              aria-label={dark ? 'Mode Terang' : 'Mode Gelap'}
+              className={`w-12 sm:w-14 h-7 rounded-full flex items-center px-1
+                          ${dark ? 'bg-indigo-600' : 'bg-slate-300'}`}
+            >
+              <div className={`w-5 h-5 rounded-full bg-white shadow flex items-center
+                               justify-center text-sm transition-transform duration-300
+                               ${dark ? 'translate-x-5 sm:translate-x-7' : 'translate-x-0'}`}>
+                {dark ? '🌙' : '☀️'}
+              </div>
+            </Btn>
+          </div>
+        </div>
+
+        {/* ── Budget progress bar ── */}
+        <div className="mt-3">
+          <div className="flex justify-between text-xs font-semibold mb-1">
+            <span className="text-slate-600 dark:text-slate-300">Anggaran Terpakai</span>
+            <span style={{ color: barColor }}>
+              {pct.toFixed(1)}%{overBudget ? ' ⚠️' : ''}
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+            <div
+              className="h-full rounded-full grow-width"
+              style={{ width: `${pct}%`, background: barColor }}
+            />
+          </div>
+          <div className="flex justify-between text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+            <span>{rpShort(spent)} terpakai</span>
+            <span>{rpShort(budget)} limit</span>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   §11  BUDGET SETTER
+══════════════════════════════════════════════════════════════ */
+function BudgetSetter({ budget, onSet }) {
+  const [editing, setEditing] = useState(false);
+  const [draft,   setDraft]   = useState(String(budget));
+
+  function commit() {
+    const n = parseInt(draft.replace(/\D/g, ''), 10);
+    if (!isNaN(n) && n > 0) onSet(n);
+    setEditing(false);
+  }
+
+  const inputCls = `flex-1 rounded-xl border border-slate-200 dark:border-slate-600
+    bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100
+    px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400
+    tap-lg`;
+
+  return (
+    <div className="glass rounded-2xl p-4 shadow-lg flex items-center gap-3 slide-left">
+      <span className="text-2xl flex-shrink-0" aria-hidden="true">🎯</span>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-bold uppercase tracking-widest
+                      text-slate-500 dark:text-slate-400 mb-1.5">
+          Limit Anggaran Bulan Ini
+        </p>
+        {editing ? (
+          <div className="flex gap-2">
+            <input
+              autoFocus
+              type="text" inputMode="numeric"
+              value={draft}
+              placeholder="cth. 10000000"
+              className={inputCls}
+              onChange={e => setDraft(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter')  commit();
+                if (e.key === 'Escape') setEditing(false);
+              }}
+              onBlur={commit}
+            />
+            <Btn
+              onClick={commit}
+              className="px-4 py-2.5 bg-orange-500 hover:bg-orange-600
+                         text-white rounded-xl text-sm font-bold flex-shrink-0 tap-lg"
+            >
+              Set
+            </Btn>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-base font-extrabold text-slate-700 dark:text-slate-200">
+              {rp(budget)}
+            </span>
+            <Btn
+              onClick={() => { setDraft(String(budget)); setEditing(true); }}
+              className="text-xs font-bold px-3 py-1.5 rounded-lg
+                         bg-orange-50 dark:bg-orange-900/30
+                         text-orange-600 dark:text-orange-400
+                         hover:bg-orange-100 dark:hover:bg-orange-800/40
+                         border border-orange-200 dark:border-orange-700"
+            >
+              ✏️ Ubah
+            </Btn>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   §12  TRANSACTION FORM
+══════════════════════════════════════════════════════════════ */
+function TxForm({ onAdd }) {
+  const [type, setType] = useState('expense');
+  const [amt,  setAmt]  = useState('');
+  const [cat,  setCat]  = useState('makan');
+  const [date, setDate] = useState(todayISO);
+  const [desc, setDesc] = useState('');
+  const [err,  setErr]  = useState('');
+  const [ok,   setOk]   = useState(false);
+
+  const availCats = type === 'income'
+    ? CATS.filter(c => INCOME_IDS.includes(c.id))
+    : CATS.filter(c => EXPENSE_IDS.includes(c.id));
+
+  // Reset category when type switches
+  useEffect(() => {
+    if (type === 'income'  && !INCOME_IDS.includes(cat))  setCat('gaji');
+    if (type === 'expense' && !EXPENSE_IDS.includes(cat)) setCat('makan');
+  }, [type]);
+
+  function submit(e) {
+    e && e.preventDefault();
+    const n = parseInt(amt.replace(/\D/g, ''), 10);
+    if (isNaN(n) || n <= 0) {
+      setErr('Masukkan nominal yang valid (lebih dari 0).');
+      return;
+    }
+    setErr('');
+    onAdd({
+      id:   uid(),
+      type, cat, amt: n,
+      date,
+      desc: desc.trim() || (CAT[cat]?.label ?? cat),
+    });
+    setAmt('');
+    setDesc('');
+    setOk(true);
+    setTimeout(() => setOk(false), 2200);
+  }
+
+  const inp = `w-full rounded-xl border border-slate-200 dark:border-slate-700
+    bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100
+    px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400
+    placeholder-slate-400 dark:placeholder-slate-500 tap-lg`;
+  const lbl = `block text-xs font-bold uppercase tracking-widest
+    text-slate-500 dark:text-slate-400 mb-1.5`;
+
+  return (
+    <div className="glass rounded-2xl p-4 sm:p-5 shadow-lg slide-left"
+         style={{ animationDelay: '80ms' }}>
+      <h2 className="text-sm font-extrabold uppercase tracking-widest
+                     text-slate-600 dark:text-slate-300 mb-4 flex items-center gap-2">
+        ➕ Tambah Transaksi
+      </h2>
+
+      {/* Type toggle */}
+      <div className="flex rounded-xl overflow-hidden border border-slate-200
+                      dark:border-slate-700 mb-4">
+        {[
+          ['expense', '💸 Pengeluaran'],
+          ['income',  '💰 Pemasukan'],
+        ].map(([t, lbl]) => (
+          <button
+            key={t} type="button"
+            onClick={() => setType(t)}
+            className={`flex-1 py-3 text-sm font-bold transition-all duration-200
+              tap-lg
+              ${type === t
+                ? t === 'expense'
+                  ? 'bg-rose-500 text-white'
+                  : 'bg-emerald-500 text-white'
+                : 'bg-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50'
+              }`}
+          >
+            {lbl}
+          </button>
+        ))}
+      </div>
+
+      <form onSubmit={submit} className="space-y-3.5">
+        <div>
+          <label className={lbl}>Nominal (Rp)</label>
+          <input
+            className={inp} type="text" inputMode="numeric"
+            placeholder="cth. 50000"
+            value={amt} onChange={e => setAmt(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className={lbl}>Kategori</label>
+          <select className={inp} value={cat} onChange={e => setCat(e.target.value)}>
+            {availCats.map(c => (
+              <option key={c.id} value={c.id}>{c.emoji} {c.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={lbl}>Tanggal</label>
+          <input className={inp} type="date" value={date}
+                 onChange={e => setDate(e.target.value)} />
+        </div>
+        <div>
+          <label className={lbl}>Catatan (opsional)</label>
+          <input
+            className={inp} type="text"
+            placeholder="cth. Makan siang bersama tim"
+            value={desc} onChange={e => setDesc(e.target.value)}
+          />
+        </div>
+
+        {err && (
+          <p className="text-xs text-rose-500 font-semibold pop-in flex items-center gap-1.5">
+            ⚠️ {err}
+          </p>
+        )}
+
+        <Btn
+          type="submit"
+          className={`w-full py-3.5 rounded-xl font-extrabold text-sm text-white
+            shadow-lg tap-lg
+            ${type === 'expense'
+              ? 'bg-gradient-to-r from-rose-500 to-orange-500 hover:opacity-90'
+              : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:opacity-90'
+            }`}
+        >
+          {ok
+            ? '✅ Berhasil ditambahkan!'
+            : type === 'expense'
+              ? '➕ Tambah Pengeluaran'
+              : '➕ Tambah Pemasukan'}
+        </Btn>
+      </form>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   §13  TRANSACTION ITEM
+══════════════════════════════════════════════════════════════ */
+function TxItem({ tx, onDelete, onEdit, idx }) {
+  const c = CAT[tx.cat] || CAT.lainnya;
+  const [removing, setRemoving] = useState(false);
+  const [editing,  setEditing]  = useState(false);
+  const [dAmt,     setDAmt]     = useState(String(tx.amt));
+  const [dDesc,    setDDesc]    = useState(tx.desc);
+
+  function del() {
+    setRemoving(true);
+    setTimeout(() => onDelete(tx.id), 320);
+  }
+  function save() {
+    const n = parseInt(dAmt.replace(/\D/g, ''), 10);
+    if (!isNaN(n) && n > 0) {
+      onEdit(tx.id, { amt: n, desc: dDesc });
+      setEditing(false);
+    }
+  }
+
+  const inpCls = `w-full text-xs rounded-lg border border-slate-200
+    dark:border-slate-600 bg-transparent px-2 py-1.5 text-slate-800
+    dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-orange-400`;
+
+  return (
+    <div
+      className={`rounded-xl border border-slate-100 dark:border-slate-700/50
+                  bg-white/85 dark:bg-slate-800/80 p-3 flex items-start
+                  gap-3 shadow-sm
+                  ${removing ? 'exit-right' : 'pop-in'}`}
+      style={{ animationDelay: `${idx * 38}ms` }}
+    >
+      {/* Icon */}
+      <div
+        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center
+                   justify-center text-lg flex-shrink-0"
+        style={{ background: c.color + '22' }}
+      >
+        {c.emoji}
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 min-w-0">
+        {editing ? (
+          <div className="space-y-1.5">
+            <input
+              value={dDesc} onChange={e => setDDesc(e.target.value)}
+              className={inpCls} placeholder="Catatan"
+            />
+            <input
+              value={dAmt} onChange={e => setDAmt(e.target.value)}
+              className={inpCls} type="text" inputMode="numeric"
+              placeholder="Nominal"
+            />
+            <div className="flex gap-1.5 pt-0.5">
+              <Btn onClick={save}
+                   className="text-xs px-2.5 py-1.5 bg-emerald-500 text-white
+                              rounded-lg font-bold">Simpan</Btn>
+              <Btn onClick={() => setEditing(false)}
+                   className="text-xs px-2.5 py-1.5 bg-slate-200 dark:bg-slate-700
+                              text-slate-600 dark:text-slate-300 rounded-lg font-bold">
+                Batal
+              </Btn>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200
+                           truncate leading-snug">
+              {tx.desc}
+            </p>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <span
+                className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                style={{ background: c.color + '20', color: c.color }}
+              >
+                {c.label}
+              </span>
+              <span className="text-xs text-slate-400 dark:text-slate-500">
+                {tx.date}
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Amount + actions */}
+      {!editing && (
+        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+          <span
+            className={`text-sm font-extrabold
+              ${tx.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}`}
+          >
+            {tx.type === 'income' ? '+' : '-'}{rpShort(tx.amt)}
+          </span>
+          <div className="flex gap-1">
+            <Btn
+              onClick={() => setEditing(true)}
+              title="Edit transaksi"
+              className="text-xs px-2 py-1 rounded-lg bg-slate-100
+                         dark:bg-slate-700 text-slate-500
+                         hover:bg-orange-100 hover:text-orange-600
+                         dark:hover:bg-orange-900/30"
+            >✏️</Btn>
+            <Btn
+              onClick={del}
+              title="Hapus transaksi"
+              className="text-xs px-2 py-1 rounded-lg bg-slate-100
+                         dark:bg-slate-700 text-slate-500
+                         hover:bg-rose-100 hover:text-rose-600
+                         dark:hover:bg-rose-900/30"
+            >🗑️</Btn>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   §14  EMPTY STATE
+══════════════════════════════════════════════════════════════ */
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 px-4
+                    text-center pop-in">
+      <div className="text-5xl mb-4 anim-float select-none">📭</div>
+      <p className="text-base font-bold text-slate-600 dark:text-slate-400 mb-1">
+        Belum ada catatan transaksi
+      </p>
+      <p className="text-sm text-slate-400 dark:text-slate-500 max-w-xs leading-relaxed">
+        Mulai tambahkan pemasukan atau pengeluaran kamu
+        menggunakan form di atas.
+      </p>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   §15  TRANSACTION LIST
+══════════════════════════════════════════════════════════════ */
+function TxList({ txs, onDelete, onEdit, onDeleteAll }) {
+  const [filter,    setFilter]    = useState('semua');
+  const [query,     setQuery]     = useState('');
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const filtered = useMemo(() => {
+    let r = [...txs].sort((a, b) => b.date.localeCompare(a.date));
+    if (filter === 'pemasukan')   r = r.filter(t => t.type === 'income');
+    if (filter === 'pengeluaran') r = r.filter(t => t.type === 'expense');
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      r = r.filter(t =>
+        t.desc.toLowerCase().includes(q) ||
+        (CAT[t.cat]?.label || '').toLowerCase().includes(q)
+      );
+    }
+    return r;
+  }, [txs, filter, query]);
+
+  const pills = [
+    { id: 'semua',        lbl: '🔍 Semua' },
+    { id: 'pemasukan',    lbl: '💰 Masuk' },
+    { id: 'pengeluaran',  lbl: '💸 Keluar' },
+  ];
+
+  return (
+    <>
+      {/* Confirm dialog (portal-like, renders in place but visually fixed) */}
+      {showConfirm && (
+        <ConfirmDialog
+          message="Apakah Anda yakin ingin menghapus semua riwayat transaksi? Tindakan ini tidak dapat dibatalkan."
+          onConfirm={() => { setShowConfirm(false); onDeleteAll(); }}
+          onCancel={() => setShowConfirm(false)}
+        />
+      )}
+
+      <div className="glass rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col gap-3
+                      slide-left" style={{ animationDelay: '150ms' }}>
+
+        {/* Header row */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h2 className="text-sm font-extrabold uppercase tracking-widest
+                         text-slate-600 dark:text-slate-300 flex items-center gap-2">
+            📋 Riwayat
+            <span className="px-2 py-0.5 rounded-full text-xs font-bold
+                             bg-orange-100 dark:bg-orange-900/40
+                             text-orange-600 dark:text-orange-400">
+              {txs.length}
+            </span>
+          </h2>
+
+          {/* Hapus Semua — only shown when there are transactions */}
+          {txs.length > 0 && (
+            <Btn
+              onClick={() => setShowConfirm(true)}
+              title="Hapus semua transaksi"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl
+                         text-xs font-bold
+                         bg-rose-50 dark:bg-rose-900/30
+                         text-rose-600 dark:text-rose-400
+                         border border-rose-200 dark:border-rose-700
+                         hover:bg-rose-100 dark:hover:bg-rose-900/50"
+            >
+              🗑️ Hapus Semua
+            </Btn>
+          )}
+        </div>
+
+        {/* Filter pills */}
+        <div className="flex gap-1.5 flex-wrap">
+          {pills.map(p => (
+            <button
+              key={p.id}
+              onClick={() => setFilter(p.id)}
+              className={`text-xs px-3 py-1.5 rounded-full font-bold
+                transition-all duration-150 tap-lg
+                ${filter === p.id
+                  ? p.id === 'pemasukan'   ? 'bg-emerald-500 text-white'
+                  : p.id === 'pengeluaran' ? 'bg-rose-500 text-white'
+                  :                          'bg-orange-500 text-white'
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+                }`}
+            >
+              {p.lbl}
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <input
+          value={query} onChange={e => setQuery(e.target.value)}
+          placeholder="🔎 Cari transaksi…"
+          className="w-full rounded-xl border border-slate-200 dark:border-slate-700
+                     bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100
+                     px-3 py-2.5 text-sm focus:outline-none focus:ring-2
+                     focus:ring-orange-400 placeholder-slate-400 dark:placeholder-slate-500
+                     tap-lg"
+        />
+
+        {/* List */}
+        <div className="space-y-2 max-h-[22rem] lg:max-h-[32rem] overflow-y-auto
+                        thin-scroll pr-0.5">
+          {txs.length === 0
+            ? <EmptyState />
+            : filtered.length === 0
+              ? (
+                <div className="text-center py-8 text-slate-400 dark:text-slate-500">
+                  <div className="text-3xl mb-2">🔍</div>
+                  <p className="text-sm font-medium">Tidak ada transaksi yang cocok</p>
+                </div>
+              )
+              : filtered.map((tx, i) => (
+                  <TxItem
+                    key={tx.id} tx={tx}
+                    onDelete={onDelete} onEdit={onEdit} idx={i}
+                  />
+                ))
+          }
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   §16  SVG DONUT CHART
+══════════════════════════════════════════════════════════════ */
+function DonutChart({ txs }) {
+  const [hov, setHov] = useState(null);
+  const [tip, setTip] = useState({ show: false, x: 0, y: 0, name: '', val: 0, color: '' });
+
+  const segs = useMemo(() => {
+    const m = {};
+    txs.filter(t => t.type === 'expense').forEach(t => {
+      m[t.cat] = (m[t.cat] || 0) + t.amt;
+    });
+    const total = Object.values(m).reduce((a, b) => a + b, 0);
+    if (!total) return [];
+    let ang = -Math.PI / 2;
+    return Object.entries(m)
+      .map(([id, v]) => ({ id, v, pct: v / total, c: CAT[id] || CAT.lainnya }))
+      .sort((a, b) => b.v - a.v)
+      .map(s => {
+        const node = { ...s, a0: ang, a1: ang + s.pct * 2 * Math.PI };
+        ang = node.a1;
+        return node;
+      });
+  }, [txs]);
+
+  if (!segs.length) {
+    return (
+      <div className="flex flex-col items-center justify-center h-48
+                      text-slate-400 dark:text-slate-500">
+        <div className="text-4xl mb-2">📊</div>
+        <p className="text-sm font-medium">Belum ada pengeluaran</p>
+      </div>
+    );
+  }
+
+  const cx = 120, cy = 115, R = 82, ri = 52;
+  const total = segs.reduce((s, g) => s + g.v, 0);
+  const hSeg  = hov ? segs.find(s => s.id === hov) : null;
+
+  function pathD(a0, a1, expand) {
+    const r1 = expand ? R + 9 : R;
+    const r2 = expand ? ri - 4 : ri;
+    const x1 = cx + r1 * Math.cos(a0),        y1 = cy + r1 * Math.sin(a0);
+    const x2 = cx + r1 * Math.cos(a1 - 0.001),y2 = cy + r1 * Math.sin(a1 - 0.001);
+    const x3 = cx + r2 * Math.cos(a1 - 0.001),y3 = cy + r2 * Math.sin(a1 - 0.001);
+    const x4 = cx + r2 * Math.cos(a0),        y4 = cy + r2 * Math.sin(a0);
+    const lg = (a1 - a0) > Math.PI ? 1 : 0;
+    return `M${x1},${y1}A${r1},${r1} 0 ${lg},1 ${x2},${y2}`
+         + `L${x3},${y3}A${r2},${r2} 0 ${lg},0 ${x4},${y4}Z`;
+  }
+
+  function onMove(e, s) {
+    const rc = e.currentTarget.closest('svg').getBoundingClientRect();
+    setTip({
+      show: true,
+      x: e.clientX - rc.left + 10,
+      y: e.clientY - rc.top  - 10,
+      name: s.c.label, val: s.v, color: s.c.color,
+    });
+  }
+
+  return (
+    <div className="relative select-none">
+      <svg
+        viewBox="0 0 240 230"
+        className="w-full max-w-[240px] mx-auto block"
+        style={{ overflow: 'visible' }}
+      >
+        {segs.map(s => (
+          <path
+            key={s.id}
+            d={pathD(s.a0, s.a1, hov === s.id)}
+            fill={s.c.color}
+            opacity={hov && hov !== s.id ? 0.42 : 1}
+            className="donut-arc"
+            style={{
+              filter: hov === s.id
+                ? `drop-shadow(0 0 10px ${s.c.color}bb)` : 'none',
+              transition: 'all 0.22s cubic-bezier(0.34,1.56,0.64,1)',
+            }}
+            onMouseEnter={e => { setHov(s.id); onMove(e, s); }}
+            onMouseMove={e  => onMove(e, s)}
+            onMouseLeave={() => { setHov(null); setTip(t => ({ ...t, show: false })); }}
+          />
+        ))}
+        {/* Centre text */}
+        <text x={cx} y={cy - 12} textAnchor="middle" fontSize="18"
+              fill={hSeg ? hSeg.c.color : '#94a3b8'}>
+          {hSeg ? hSeg.c.emoji : '💸'}
+        </text>
+        <text x={cx} y={cy + 7} textAnchor="middle" fontSize="12"
+              fontWeight="800" fill={hSeg ? hSeg.c.color : '#1e293b'}>
+          {hSeg ? rpShort(hSeg.v) : rpShort(total)}
+        </text>
+        <text x={cx} y={cy + 24} textAnchor="middle" fontSize="10" fill="#94a3b8">
+          {hSeg ? (hSeg.pct * 100).toFixed(1) + '%' : 'total keluar'}
+        </text>
+      </svg>
+
+      {/* Tooltip */}
+      {tip.show && (
+        <div
+          className="absolute pointer-events-none glass rounded-xl
+                     px-3 py-2 shadow-xl text-xs z-30"
+          style={{ left: tip.x, top: tip.y, minWidth: 128 }}
+        >
+          <p className="font-bold text-slate-700 dark:text-slate-200">{tip.name}</p>
+          <p className="font-extrabold mt-0.5" style={{ color: tip.color }}>
+            {rp(tip.val)}
+          </p>
+        </div>
+      )}
+
+      {/* Legend */}
+      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 px-1">
+        {segs.map(s => (
+          <div
+            key={s.id}
+            className="flex items-center gap-1.5 cursor-pointer"
+            onMouseEnter={() => setHov(s.id)}
+            onMouseLeave={() => setHov(null)}
+          >
+            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{ background: s.c.color }} />
+            <span className={`text-xs font-medium truncate
+              ${hov === s.id
+                ? 'text-slate-800 dark:text-white'
+                : 'text-slate-500 dark:text-slate-400'}`}>
+              {s.c.label}
+            </span>
+            <span className="text-xs font-extrabold ml-auto flex-shrink-0"
+                  style={{ color: s.c.color }}>
+              {(s.pct * 100).toFixed(0)}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   §17  SVG BAR CHART
+══════════════════════════════════════════════════════════════ */
+function BarChart({ txs }) {
+  const [hov, setHov] = useState(null);
+
+  const data = useMemo(() => {
+    const m = {};
+    txs.forEach(t => {
+      const mo = t.date.slice(0, 7);
+      if (!m[mo]) m[mo] = { mo, inc: 0, exp: 0 };
+      if (t.type === 'income')  m[mo].inc += t.amt;
+      if (t.type === 'expense') m[mo].exp += t.amt;
+    });
+    return Object.values(m).sort((a, b) => a.mo.localeCompare(b.mo)).slice(-6);
+  }, [txs]);
+
+  if (!data.length) {
+    return (
+      <div className="flex items-center justify-center h-32
+                      text-slate-400 dark:text-slate-500 text-sm">
+        Belum ada data
+      </div>
+    );
+  }
+
+  const W = 540, H = 180, PL = 58, PR = 12, PT = 10, PB = 38;
+  const iW = W - PL - PR, iH = H - PT - PB;
+  const maxV = Math.max(...data.flatMap(d => [d.inc, d.exp]), 1);
+
+  function makeTicks() {
+    const mag  = Math.pow(10, Math.floor(Math.log10(maxV)));
+    const step = Math.ceil(maxV / 4 / mag) * mag || 1;
+    const t = [];
+    for (let v = 0; v <= maxV * 1.15; v += step) t.push(v);
+    return t;
+  }
+  const ticks = makeTicks();
+  const maxY  = ticks[ticks.length - 1] || 1;
+  const slotW = iW / data.length;
+  const bw    = Math.floor(slotW * 0.3);
+  const MO    = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full"
+        style={{ minWidth: 280, maxHeight: 180 }}
+      >
+        {/* Grid lines + Y labels */}
+        {ticks.map(v => {
+          const y = PT + iH - (v / maxY) * iH;
+          return (
+            <g key={v}>
+              <line x1={PL} y1={y} x2={W - PR} y2={y}
+                    stroke="#e2e8f0" strokeWidth="1" opacity="0.6" />
+              <text x={PL - 5} y={y + 4} textAnchor="end" fontSize="9" fill="#94a3b8">
+                {v >= 1e6 ? `Rp ${(v/1e6).toFixed(0)}jt`
+                           : v >= 1e3 ? `Rp ${(v/1e3).toFixed(0)}rb`
+                           : `Rp ${v}`}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Bars */}
+        {data.map((d, i) => {
+          const x    = PL + i * slotW + slotW * 0.05;
+          const incH = (d.inc / maxY) * iH;
+          const expH = (d.exp / maxY) * iH;
+          const isH  = hov === i;
+          const mo   = MO[parseInt(d.mo.slice(5), 10)] || d.mo.slice(5);
+          return (
+            <g
+              key={d.mo}
+              onMouseEnter={() => setHov(i)}
+              onMouseLeave={() => setHov(null)}
+              style={{ cursor: 'pointer' }}
+            >
+              {/* Income bar */}
+              <rect x={x}         y={PT + iH - incH} width={bw} height={incH}
+                    fill="#22c55e" rx="4"
+                    opacity={hov !== null && !isH ? 0.45 : 1}
+                    style={{ transition: 'all .18s' }} />
+              {/* Expense bar */}
+              <rect x={x + bw + 4} y={PT + iH - expH} width={bw} height={expH}
+                    fill="#f43f5e" rx="4"
+                    opacity={hov !== null && !isH ? 0.45 : 1}
+                    style={{ transition: 'all .18s' }} />
+              {/* Hover tooltip */}
+              {isH && (
+                <foreignObject
+                  x={x - 8} y={PT + iH - Math.max(incH, expH) - 54}
+                  width="112" height="50"
+                >
+                  <div
+                    xmlns="http://www.w3.org/1999/xhtml"
+                    className="glass rounded-xl px-2 py-1.5 shadow-lg text-xs text-center"
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    <div className="text-emerald-500 font-bold">{rpShort(d.inc)}</div>
+                    <div className="text-rose-500 font-bold">{rpShort(d.exp)}</div>
+                  </div>
+                </foreignObject>
+              )}
+              {/* X label */}
+              <text x={x + bw} y={H - PB + 15} textAnchor="middle"
+                    fontSize="10" fill="#94a3b8">
+                {mo}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Legend */}
+        <circle cx={PL + 6}  cy={H - 3} r="4" fill="#22c55e" />
+        <text   x={PL + 14} y={H}      fontSize="10" fill="#64748b">Pemasukan</text>
+        <circle cx={PL + 90} cy={H - 3} r="4" fill="#f43f5e" />
+        <text   x={PL + 98} y={H}      fontSize="10" fill="#64748b">Pengeluaran</text>
+      </svg>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   §18  CASH FLOW DIAGRAM
+══════════════════════════════════════════════════════════════ */
+function FlowNode({ emoji, label, amount, color, delay = 0 }) {
+  const [vis, setVis] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setVis(true), delay);
+    return () => clearTimeout(t);
+  }, [delay]);
+
+  return (
+    <div
+      className={`flow-node flex flex-col items-center gap-1 select-none
+                  ${vis ? 'pop-in' : 'opacity-0'}`}
+      style={{ animationDelay: `${delay}ms`, minWidth: 68 }}
+    >
+      <div
+        className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center
+                   justify-center text-xl sm:text-2xl shadow-lg"
+        style={{ background: color + '20', border: `2.5px solid ${color}40` }}
+      >
+        {emoji}
+      </div>
+      <p className="text-xs font-bold text-slate-600 dark:text-slate-300
+                    text-center leading-tight" style={{ maxWidth: 72 }}>
+        {label}
+      </p>
+      <p className="text-xs font-extrabold" style={{ color }}>
+        {rpShort(amount)}
+      </p>
+    </div>
+  );
+}
+
+function CashFlow({ txs, totalInc, totalExp, budget }) {
+  const rem = totalInc - totalExp;
+
+  const topCats = useMemo(() => {
+    const m = {};
+    txs.filter(t => t.type === 'expense').forEach(t => {
+      m[t.cat] = (m[t.cat] || 0) + t.amt;
+    });
+    return Object.entries(m)
+      .map(([id, v]) => ({ ...(CAT[id] || CAT.lainnya), v }))
+      .sort((a, b) => b.v - a.v)
+      .slice(0, 5);
+  }, [txs]);
+
+  if (!txs.length) {
+    return (
+      <div className="flex flex-col items-center justify-center h-36
+                      text-slate-400 dark:text-slate-500">
+        <div className="text-4xl mb-2">🔄</div>
+        <p className="text-sm font-medium">Belum ada data aliran dana</p>
+      </div>
+    );
+  }
+
+  const HAr = ({ color = '#94a3b8' }) => (
+    <div className="flex items-center flex-shrink-0" style={{ minWidth: 20 }}>
+      <div className="flex-1 h-px" style={{ background: color, minWidth: 8 }} />
+      <svg width="7" height="10" viewBox="0 0 7 10">
+        <path d="M7 5L0 0v10z" fill={color} />
+      </svg>
+    </div>
+  );
+  const VAr = ({ color = '#94a3b8' }) => (
+    <div className="flex flex-col items-center" style={{ height: 20, flexShrink: 0 }}>
+      <div className="w-px flex-1" style={{ background: color }} />
+      <svg width="10" height="6" viewBox="0 0 10 6">
+        <path d="M5 6L0 0h10z" fill={color} />
+      </svg>
+    </div>
+  );
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="min-w-[360px] py-2 flex flex-col items-center gap-0.5">
+        {/* Row 1 */}
+        <div className="flex items-center gap-1.5 flex-wrap justify-center">
+          <FlowNode emoji="💰" label="Pemasukan"  amount={totalInc} color="#22c55e" delay={0} />
+          <HAr color="#22c55e" />
+          <FlowNode emoji="🏦" label="Anggaran"   amount={budget}   color="#0ea5e9" delay={100} />
+          <HAr color={rem >= 0 ? '#22c55e' : '#ef4444'} />
+          <FlowNode
+            emoji={rem >= 0 ? '✅' : '⚠️'}
+            label="Sisa Saldo" amount={rem}
+            color={rem >= 0 ? '#22c55e' : '#ef4444'} delay={200}
+          />
+        </div>
+        <VAr color="#f43f5e" />
+        {/* Row 2 */}
+        <FlowNode emoji="💸" label="Pengeluaran" amount={totalExp} color="#f43f5e" delay={320} />
+        {topCats.length > 0 && (
+          <>
+            <VAr color="#94a3b8" />
+            {/* Row 3 — top categories */}
+            <div className="flex items-start justify-center gap-2 flex-wrap">
+              {topCats.map((c, i) => (
+                <FlowNode
+                  key={c.id} emoji={c.emoji} label={c.label}
+                  amount={c.v} color={c.color} delay={420 + i * 65}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   §19  TOP SPENDERS
+══════════════════════════════════════════════════════════════ */
+function TopSpenders({ txs }) {
+  const data = useMemo(() => {
+    const m = {};
+    txs.filter(t => t.type === 'expense').forEach(t => {
+      m[t.cat] = (m[t.cat] || 0) + t.amt;
+    });
+    const total = Object.values(m).reduce((a, b) => a + b, 0);
+    return Object.entries(m)
+      .map(([id, v]) => ({
+        ...(CAT[id] || CAT.lainnya), v,
+        pct: total > 0 ? (v / total) * 100 : 0,
+      }))
+      .sort((a, b) => b.v - a.v)
+      .slice(0, 6);
+  }, [txs]);
+
+  if (!data.length) return null;
+
+  return (
+    <div className="glass rounded-2xl p-4 sm:p-5 shadow-lg slide-right"
+         style={{ animationDelay: '300ms' }}>
+      <h3 className="text-sm font-extrabold uppercase tracking-widest
+                     text-slate-600 dark:text-slate-300 mb-4">
+        🏆 Pengeluaran Terbesar
+      </h3>
+      <div className="space-y-3">
+        {data.map((c, i) => (
+          <div
+            key={c.id} className="pop-in"
+            style={{ animationDelay: `${300 + i * 50}ms` }}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-base flex-shrink-0">{c.emoji}</span>
+                <span className="text-xs font-semibold text-slate-600
+                                 dark:text-slate-300 truncate">
+                  {c.label}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                <span className="text-xs text-slate-400 dark:text-slate-500">
+                  {c.pct.toFixed(1)}%
+                </span>
+                <span className="text-xs font-extrabold text-rose-500">
+                  {rpShort(c.v)}
+                </span>
+              </div>
+            </div>
+            <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+              <div
+                className="h-full rounded-full bar-grow"
+                style={{
+                  width: `${c.pct}%`,
+                  background: c.color,
+                  animationDelay: `${340 + i * 65}ms`,
+                }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   §20  VISUAL PANEL (right column)
+══════════════════════════════════════════════════════════════ */
+function VisualPanel({ txs, totalInc, totalExp, budget }) {
+  const [tab, setTab] = useState('donut');
+  const tabs = [
+    { id: 'donut', lbl: '🍩 Kategori' },
+    { id: 'bar',   lbl: '📊 Bulanan'  },
+    { id: 'flow',  lbl: '🔄 Aliran'   },
+  ];
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Chart card */}
+      <div className="glass rounded-2xl p-4 sm:p-5 shadow-lg slide-right"
+           style={{ animationDelay: '180ms' }}>
+        {/* Tab bar */}
+        <div className="flex gap-2 mb-4 flex-wrap">
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold
+                transition-all duration-200 tap-lg
+                ${tab === t.id
+                  ? 'bg-orange-500 text-white shadow-md'
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+                }`}
+            >
+              {t.lbl}
+            </button>
+          ))}
+        </div>
+
+        {/* Chart content */}
+        <div key={tab} className="pop-in">
+          {tab === 'donut' && (
+            <>
+              <p className="text-xs font-bold uppercase tracking-widest
+                            text-slate-500 dark:text-slate-400 mb-3">
+                Rincian Pengeluaran per Kategori
+              </p>
+              <DonutChart txs={txs} />
+            </>
+          )}
+          {tab === 'bar' && (
+            <>
+              <p className="text-xs font-bold uppercase tracking-widest
+                            text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-1.5">
+                <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                Pemasukan vs
+                <span className="inline-block w-2.5 h-2.5 rounded-full bg-rose-500 mx-0.5" />
+                Pengeluaran per Bulan
+              </p>
+              <BarChart txs={txs} />
+            </>
+          )}
+          {tab === 'flow' && (
+            <>
+              <p className="text-xs font-bold uppercase tracking-widest
+                            text-slate-500 dark:text-slate-400 mb-3">
+                Diagram Aliran Dana
+              </p>
+              <CashFlow txs={txs} totalInc={totalInc} totalExp={totalExp} budget={budget} />
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Top spenders */}
+      <TopSpenders txs={txs} />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   §21  ROOT APP
+   
+   isLoaded FLAG — THE KEY AUTOSAVE GUARANTEE:
+   ─────────────────────────────────────────────
+   1. State initialises with empty arrays (no demo data).
+   2. First useEffect reads localStorage into state and sets
+      isLoaded = true.  This is the ONLY place data is read.
+   3. The save useEffect has `if (!isLoaded) return` as its
+      very first line. This guarantees setItem is NEVER called
+      before getItem has finished — preventing the save-on-
+      first-render overwrite bug that caused data loss.
+══════════════════════════════════════════════════════════════ */
+function App() {
+  /* ── Initial state: empty — demo data removed ── */
+  const [txs,      setTxs]      = useState([]);
+  const [budget,   setBudget]   = useState(10000000);
+  const [dark,     setDark]     = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);   // ← guards localStorage writes
+  const [toast,    setToast]    = useState(null);
+  const importRef = useRef(null);
+
+  /* ── §A  READ from localStorage (runs once after mount) ── */
+  useEffect(() => {
+    try {
+      const savedTxs    = LS.getJSON(KEYS.TXS,    null);
+      const savedBudget = parseInt(LS.get(KEYS.BUDGET, ''), 10);
+      const savedTheme  = LS.get(KEYS.THEME, 'light');
+
+      // Only restore if data is valid — never overwrite with empty
+      if (Array.isArray(savedTxs))                setTxs(savedTxs);
+      if (!isNaN(savedBudget) && savedBudget > 0) setBudget(savedBudget);
+      setDark(savedTheme === 'dark');
+    } catch {
+      /* Storage unavailable — silently use defaults */
+    } finally {
+      /*
+       * CRITICAL: isLoaded is set to true AFTER all reads are done.
+       * The save useEffect below will do nothing until this fires.
+       */
+      setIsLoaded(true);
+    }
+  }, []); /* empty dep array — runs exactly once */
+
+  /* ── §B  APPLY dark mode class to <html> ── */
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark);
+    /*
+     * Only persist theme AFTER initial load to avoid a race where
+     * the save fires before the read completes on slow devices.
+     */
+    if (isLoaded) LS.set(KEYS.THEME, dark ? 'dark' : 'light');
+  }, [dark, isLoaded]);
+
+  /* ── §C  SAVE to localStorage (guarded by isLoaded) ── */
+  useEffect(() => {
+    /*
+     * isLoaded guard: this effect runs on every change to txs, budget,
+     * or isLoaded. On first render isLoaded=false so we return early —
+     * no data is ever written before the read completes.
+     * Once isLoaded flips to true, all subsequent changes auto-save.
+     */
+    if (!isLoaded) return;
+    LS.setJSON(KEYS.TXS,    txs);
+    LS.set(KEYS.BUDGET, String(budget));
+  }, [txs, budget, isLoaded]);
+
+  /* ── Derived totals ── */
+  const totalInc = useMemo(
+    () => txs.filter(t => t.type === 'income') .reduce((s, t) => s + t.amt, 0),
+    [txs]
+  );
+  const totalExp = useMemo(
+    () => txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amt, 0),
+    [txs]
+  );
+  const netBal = totalInc - totalExp;
+
+  /* ── CRUD ── */
+  const addTx  = useCallback(tx  => setTxs(p => [tx, ...p]),          []);
+  const delTx  = useCallback(id  => setTxs(p => p.filter(t => t.id !== id)), []);
+  const editTx = useCallback((id, u) => setTxs(p => p.map(t => t.id === id ? { ...t, ...u } : t)), []);
+  const delAll = useCallback(() => setTxs([]), []);
+
+  /* ── EXPORT backup ── */
+  function handleExport() {
+    const payload = {
+      version: 3,
+      exportedAt: new Date().toISOString(),
+      budget,
+      transactions: txs,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'tabungan-onlen-data.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setToast({ msg: '✅ Data berhasil diekspor!', type: 'success' });
+  }
+
+  /* ── IMPORT backup ── */
+  function handleImportClick() { importRef.current?.click(); }
+
+  function handleImportFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!Array.isArray(data.transactions)) throw new Error();
+        setTxs(data.transactions);
+        if (data.budget && !isNaN(data.budget)) setBudget(data.budget);
+        setToast({
+          msg:  `✅ ${data.transactions.length} transaksi berhasil diimpor!`,
+          type: 'success',
+        });
+      } catch {
+        setToast({ msg: '❌ File tidak valid. Pastikan format JSON benar.', type: 'error' });
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
+
+  /* ── Render ── */
+  const bgCls = dark
+    ? 'bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900'
+    : 'bg-gradient-to-br from-orange-50 via-yellow-50 to-emerald-50';
+
+  return (
+    <div className={`min-h-dvh font-sans ${bgCls}`}>
+
+      {/* Hidden file input for import */}
+      <input
+        ref={importRef} type="file" accept=".json,application/json"
+        className="sr-only" onChange={handleImportFile}
+      />
+
+      {/* ── Header ── */}
+      <Header
+        dark={dark}
+        onToggle={() => setDark(d => !d)}
+        spent={totalExp}
+        budget={budget}
+        onExport={handleExport}
+        onImportClick={handleImportClick}
+      />
+
+      {/* ── Main content ── */}
+      <main className="max-w-screen-xl mx-auto px-3 sm:px-6 py-5 space-y-4">
+
+        {/* Summary cards — always 1 col on xs, 3 col on sm+ */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <SummaryCard
+            title="Pemasukan" value={totalInc} emoji="💰"
+            textCls="text-emerald-600 dark:text-emerald-400"
+            iconBg="#dcfce7" delay={0}
+          />
+          <SummaryCard
+            title="Pengeluaran" value={totalExp} emoji="💸"
+            textCls="text-rose-600 dark:text-rose-400"
+            iconBg="#ffe4e6" delay={90}
+          />
+          <SummaryCard
+            title="Sisa Saldo" value={netBal} emoji={netBal >= 0 ? '✅' : '⚠️'}
+            textCls={netBal >= 0
+              ? 'text-orange-600 dark:text-orange-400'
+              : 'text-amber-600 dark:text-amber-400'}
+            iconBg={netBal >= 0 ? '#fff7ed' : '#fef9c3'}
+            delay={180}
+          />
+        </div>
+
+        {/*
+          ── Two-column layout:
+             Mobile  (<lg):  single column stacked
+               Order: Form → Visual Panel → History
+             Desktop (≥lg):  side-by-side
+               Left: Budget setter + Form + History
+               Right: Sticky visual dashboard
+        ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+
+          {/* ════ LEFT COLUMN ════ */}
+          <div className="flex flex-col gap-4 order-1">
+            <BudgetSetter budget={budget} onSet={setBudget} />
+            <TxForm onAdd={addTx} />
+
+            {/*
+              On mobile: Visual panel appears between Form and History.
+              We achieve this with order classes — rendered here in the DOM
+              but visually inserted between form and list on mobile via CSS order.
+            */}
+            <div className="order-2 lg:hidden">
+              <VisualPanel
+                txs={txs}
+                totalInc={totalInc} totalExp={totalExp} budget={budget}
+              />
+            </div>
+
+            <TxList
+              txs={txs}
+              onDelete={delTx} onEdit={editTx} onDeleteAll={delAll}
+            />
+          </div>
+
+          {/* ════ RIGHT COLUMN (desktop only — sticky) ════ */}
+          <div className="hidden lg:block order-2 right-sticky">
+            <VisualPanel
+              txs={txs}
+              totalInc={totalInc} totalExp={totalExp} budget={budget}
+            />
+          </div>
+        </div>
+      </main>
+
+      <footer className="text-center py-5 text-xs text-slate-400 dark:text-slate-600 font-medium">
+        Tabungan Onlen · Data tersimpan otomatis di browser kamu 🔐
+      </footer>
+
+      {/* Toast notification */}
+      {toast && (
+        <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   §22  MOUNT
+══════════════════════════════════════════════════════════════ */
+const container = document.getElementById('root');
+const appRoot   = ReactDOM.createRoot(container);
+appRoot.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+</script>
+</body>
+</html>
+
+
